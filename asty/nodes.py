@@ -76,13 +76,20 @@ class NodeType(str, Enum):
     FUNC_DECL = 'FuncDecl'
     FILE = 'File'
     PACKAGE = 'Package'
+    MATCH_RULE = 'MatchRule'
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}.{self.name}"
+
+    def __pretty__(self, fmt, skip_exc):
+        return repr(self)
 
 
 NodeOrSequence = Union['Node', Sequence['Node']]
 FieldSequence = Iterable[tuple[str, NodeOrSequence]]
 
 
-class Node(BaseModel, ABC):
+class BaseNode(BaseModel, ABC):
     node_type: NodeType = Field(alias='NodeType')
 
     @abstractmethod
@@ -90,8 +97,16 @@ class Node(BaseModel, ABC):
         ...
 
     @classmethod
-    def from_values(cls, **kwargs):
-        return cls.construct({'node_type', *kwargs.keys()}, **kwargs)
+    def construct(cls, _fields_set: Optional[set[str]] = None, **values):
+        _fields_set = _fields_set or {'node_type', *values.keys()}
+        return super().construct(_fields_set, **values)
+
+    def __repr_args__(self):
+        return [
+            (k, v)
+            for k, v in self.__dict__.items()
+            if k in self.__fields_set__ - {'node_type'}
+        ]
 
 
 def iter_field(name: str, node: Optional[NodeOrSequence]):
@@ -99,77 +114,72 @@ def iter_field(name: str, node: Optional[NodeOrSequence]):
         yield name, node
 
 
-ExprNode = Annotated[
+Node = Annotated[
     Union[
-        "BadExprNode",
-        "IdentNode",
-        "BasicLitNode",
-        "FuncLitNode",
-        "CompositeLitNode",
-        "ParenExprNode",
-        "SelectorExprNode",
-        "IndexExprNode",
-        "SliceExprNode",
-        "TypeAssertExprNode",
-        "CallExprNode",
-        "StarExprNode",
-        "UnaryExprNode",
-        "BinaryExprNode",
-        "KeyValueExprNode",
-        "ArrayTypeNode",
-        "StructTypeNode",
-        "FuncTypeNode",
-        "InterfaceTypeNode",
-        "MapTypeNode",
-        "ChanTypeNode",
-    ],
-    Field(discriminator="node_type"),
-]
-StmtNode = Annotated[
-    Union[
-        "BadStmtNode",
-        "DeclStmtNode",
-        "EmptyStmtNode",
-        "LabeledStmtNode",
-        "ExprStmtNode",
-        "SendStmtNode",
-        "IncDecStmtNode",
-        "AssignStmtNode",
-        "GoStmtNode",
-        "DeferStmtNode",
-        "ReturnStmtNode",
-        "BranchStmtNode",
-        "BlockStmtNode",
-        "IfStmtNode",
-        "CaseClauseNode",
-        "SwitchStmtNode",
-        "TypeSwitchStmtNode",
-        "CommClauseNode",
-        "SelectStmtNode",
-        "ForStmtNode",
-        "RangeStmtNode",
-    ],
-    Field(discriminator="node_type"),
-]
-SpecNode = Annotated[
-    Union[
-        "ImportSpecNode",
-        "ValueSpecNode",
-        "TypeSpecNode",
-    ],
-    Field(discriminator="node_type"),
-]
-DeclNode = Annotated[
-    Union[
-        "BadDeclNode",
-        "GenDeclNode",
-        "FuncDeclNode",
+        'PositionNode',
+        'CommentNode',
+        'CommentGroupNode',
+        'FieldNode',
+        'FieldListNode',
+        'BadExprNode',
+        'IdentNode',
+        'EllipsisNode',
+        'BasicLitNode',
+        'FuncLitNode',
+        'CompositeLitNode',
+        'ParenExprNode',
+        'SelectorExprNode',
+        'IndexExprNode',
+        'IndexListExprNode',
+        'SliceExprNode',
+        'TypeAssertExprNode',
+        'CallExprNode',
+        'StarExprNode',
+        'UnaryExprNode',
+        'BinaryExprNode',
+        'KeyValueExprNode',
+        'ArrayTypeNode',
+        'StructTypeNode',
+        'FuncTypeNode',
+        'InterfaceTypeNode',
+        'MapTypeNode',
+        'ChanTypeNode',
+        'BadStmtNode',
+        'DeclStmtNode',
+        'EmptyStmtNode',
+        'LabeledStmtNode',
+        'ExprStmtNode',
+        'SendStmtNode',
+        'IncDecStmtNode',
+        'AssignStmtNode',
+        'GoStmtNode',
+        'DeferStmtNode',
+        'ReturnStmtNode',
+        'BranchStmtNode',
+        'BlockStmtNode',
+        'IfStmtNode',
+        'CaseClauseNode',
+        'SwitchStmtNode',
+        'TypeSwitchStmtNode',
+        'CommClauseNode',
+        'SelectStmtNode',
+        'ForStmtNode',
+        'RangeStmtNode',
+        'ImportSpecNode',
+        'ValueSpecNode',
+        'TypeSpecNode',
+        'BadDeclNode',
+        'GenDeclNode',
+        'FuncDeclNode',
+        'FileNode',
+        'PackageNode',
+        'MatchRuleNode',
     ],
     Field(discriminator="node_type"),
 ]
 
 
-class PositionNode(Node):
+class PositionNode(BaseNode):
     node_type: Literal[NodeType.POSITION] = Field(alias='NodeType', default=NodeType.POSITION)
     filename: Optional[str] = Field(alias='Filename', default=None)
     offset: Optional[int] = Field(alias='Offset', default=None)
@@ -180,7 +190,7 @@ class PositionNode(Node):
         yield from ()
 
 
-class CommentNode(Node):
+class CommentNode(BaseNode):
     node_type: Literal[NodeType.COMMENT] = Field(alias='NodeType', default=NodeType.COMMENT)
     slash: Optional[PositionNode] = Field(alias='Slash', default=None)
     text: Optional[str] = Field(alias='Text', default=None)
@@ -189,7 +199,7 @@ class CommentNode(Node):
         yield from iter_field('slash', self.slash)
 
 
-class CommentGroupNode(Node):
+class CommentGroupNode(BaseNode):
     node_type: Literal[NodeType.COMMENT_GROUP] = Field(alias='NodeType', default=NodeType.COMMENT_GROUP)
     comment_list: Optional[list[CommentNode]] = Field(alias='List')
 
@@ -197,11 +207,11 @@ class CommentGroupNode(Node):
         yield from iter_field('comment_list', self.comment_list)
 
 
-class FieldNode(Node):
+class FieldNode(BaseNode):
     node_type: Literal[NodeType.FIELD] = Field(alias='NodeType', default=NodeType.FIELD)
     doc: Optional[CommentGroupNode] = Field(alias='Doc', default=None)
     names: Optional[list['IdentNode']] = Field(alias='Names')
-    type: Optional[ExprNode] = Field(alias='Type', default=None)
+    type: Optional[Node] = Field(alias='Type', default=None)
     tag: Optional['BasicLitNode'] = Field(alias='Tag', default=None)
     comment: Optional[CommentGroupNode] = Field(alias='Comment', default=None)
 
@@ -213,7 +223,7 @@ class FieldNode(Node):
         yield from iter_field('comment', self.comment)
 
 
-class FieldListNode(Node):
+class FieldListNode(BaseNode):
     node_type: Literal[NodeType.FIELD_LIST] = Field(alias='NodeType', default=NodeType.FIELD_LIST)
     opening: Optional[PositionNode] = Field(alias='Opening', default=None)
     field_list: Optional[list[FieldNode]] = Field(alias='List')
@@ -225,7 +235,7 @@ class FieldListNode(Node):
         yield from iter_field('closing', self.closing)
 
 
-class BadExprNode(Node):
+class BadExprNode(BaseNode):
     node_type: Literal[NodeType.BAD_EXPR] = Field(alias='NodeType', default=NodeType.BAD_EXPR)
     from_pos: Optional[PositionNode] = Field(alias='From', default=None)
     to_pos: Optional[PositionNode] = Field(alias='To', default=None)
@@ -235,7 +245,7 @@ class BadExprNode(Node):
         yield from iter_field('to_pos', self.to_pos)
 
 
-class IdentNode(Node):
+class IdentNode(BaseNode):
     node_type: Literal[NodeType.IDENT] = Field(alias='NodeType', default=NodeType.IDENT)
     name_pos: Optional[PositionNode] = Field(alias='NamePos', default=None)
     name: Optional[str] = Field(alias='Name', default=None)
@@ -245,17 +255,17 @@ class IdentNode(Node):
         yield from iter_field('name_pos', self.name_pos)
 
 
-class EllipsisNode(Node):
+class EllipsisNode(BaseNode):
     node_type: Literal[NodeType.ELLIPSIS] = Field(alias='NodeType', default=NodeType.ELLIPSIS)
     ellipsis: Optional[PositionNode] = Field(alias='Ellipsis', default=None)
-    elt: Optional[ExprNode] = Field(alias='Elt', default=None)
+    elt: Optional[Node] = Field(alias='Elt', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('ellipsis', self.ellipsis)
         yield from iter_field('elt', self.elt)
 
 
-class BasicLitNode(Node):
+class BasicLitNode(BaseNode):
     node_type: Literal[NodeType.BASIC_LIT] = Field(alias='NodeType', default=NodeType.BASIC_LIT)
     value_pos: Optional[PositionNode] = Field(alias='ValuePos', default=None)
     kind: Optional[str] = Field(alias='Kind', default=None)
@@ -265,7 +275,7 @@ class BasicLitNode(Node):
         yield from iter_field('value_pos', self.value_pos)
 
 
-class FuncLitNode(Node):
+class FuncLitNode(BaseNode):
     node_type: Literal[NodeType.FUNC_LIT] = Field(alias='NodeType', default=NodeType.FUNC_LIT)
     type: Optional['FuncTypeNode'] = Field(alias='Type', default=None)
     body: Optional['BlockStmtNode'] = Field(alias='Body', default=None)
@@ -275,11 +285,11 @@ class FuncLitNode(Node):
         yield from iter_field('body', self.body)
 
 
-class CompositeLitNode(Node):
+class CompositeLitNode(BaseNode):
     node_type: Literal[NodeType.COMPOSITE_LIT] = Field(alias='NodeType', default=NodeType.COMPOSITE_LIT)
-    type: Optional[ExprNode] = Field(alias='Type', default=None)
+    type: Optional[Node] = Field(alias='Type', default=None)
     lbrace: Optional[PositionNode] = Field(alias='Lbrace', default=None)
-    elts: Optional[list[ExprNode]] = Field(alias='Elts')
+    elts: Optional[list[Node]] = Field(alias='Elts')
     rbrace: Optional[PositionNode] = Field(alias='Rbrace', default=None)
     incomplete: Optional[bool] = Field(alias='Incomplete', default=None)
 
@@ -290,10 +300,10 @@ class CompositeLitNode(Node):
         yield from iter_field('rbrace', self.rbrace)
 
 
-class ParenExprNode(Node):
+class ParenExprNode(BaseNode):
     node_type: Literal[NodeType.PAREN_EXPR] = Field(alias='NodeType', default=NodeType.PAREN_EXPR)
     lparen: Optional[PositionNode] = Field(alias='Lparen', default=None)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
     rparen: Optional[PositionNode] = Field(alias='Rparen', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -302,9 +312,9 @@ class ParenExprNode(Node):
         yield from iter_field('rparen', self.rparen)
 
 
-class SelectorExprNode(Node):
+class SelectorExprNode(BaseNode):
     node_type: Literal[NodeType.SELECTOR_EXPR] = Field(alias='NodeType', default=NodeType.SELECTOR_EXPR)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
     sel: Optional[IdentNode] = Field(alias='Sel', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -312,11 +322,11 @@ class SelectorExprNode(Node):
         yield from iter_field('sel', self.sel)
 
 
-class IndexExprNode(Node):
+class IndexExprNode(BaseNode):
     node_type: Literal[NodeType.INDEX_EXPR] = Field(alias='NodeType', default=NodeType.INDEX_EXPR)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
     lbrack: Optional[PositionNode] = Field(alias='Lbrack', default=None)
-    index: Optional[ExprNode] = Field(alias='Index', default=None)
+    index: Optional[Node] = Field(alias='Index', default=None)
     rbrack: Optional[PositionNode] = Field(alias='Rbrack', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -326,11 +336,11 @@ class IndexExprNode(Node):
         yield from iter_field('rbrack', self.rbrack)
 
 
-class IndexListExprNode(Node):
+class IndexListExprNode(BaseNode):
     node_type: Literal[NodeType.INDEX_LIST_EXPR] = Field(alias='NodeType', default=NodeType.INDEX_LIST_EXPR)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
     lbrack: Optional[PositionNode] = Field(alias='Lbrack', default=None)
-    indices: Optional[list[ExprNode]] = Field(alias='Indices')
+    indices: Optional[list[Node]] = Field(alias='Indices')
     rbrack: Optional[PositionNode] = Field(alias='Rbrack', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -340,13 +350,13 @@ class IndexListExprNode(Node):
         yield from iter_field('rbrack', self.rbrack)
 
 
-class SliceExprNode(Node):
+class SliceExprNode(BaseNode):
     node_type: Literal[NodeType.SLICE_EXPR] = Field(alias='NodeType', default=NodeType.SLICE_EXPR)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
     lbrack: Optional[PositionNode] = Field(alias='Lbrack', default=None)
-    low: Optional[ExprNode] = Field(alias='Low', default=None)
-    high: Optional[ExprNode] = Field(alias='High', default=None)
-    max: Optional[ExprNode] = Field(alias='Max', default=None)
+    low: Optional[Node] = Field(alias='Low', default=None)
+    high: Optional[Node] = Field(alias='High', default=None)
+    max: Optional[Node] = Field(alias='Max', default=None)
     slice3: Optional[bool] = Field(alias='Slice3', default=None)
     rbrack: Optional[PositionNode] = Field(alias='Rbrack', default=None)
 
@@ -359,11 +369,11 @@ class SliceExprNode(Node):
         yield from iter_field('rbrack', self.rbrack)
 
 
-class TypeAssertExprNode(Node):
+class TypeAssertExprNode(BaseNode):
     node_type: Literal[NodeType.TYPE_ASSERT_EXPR] = Field(alias='NodeType', default=NodeType.TYPE_ASSERT_EXPR)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
     lparen: Optional[PositionNode] = Field(alias='Lparen', default=None)
-    type: Optional[ExprNode] = Field(alias='Type', default=None)
+    type: Optional[Node] = Field(alias='Type', default=None)
     rparen: Optional[PositionNode] = Field(alias='Rparen', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -373,11 +383,11 @@ class TypeAssertExprNode(Node):
         yield from iter_field('rparen', self.rparen)
 
 
-class CallExprNode(Node):
+class CallExprNode(BaseNode):
     node_type: Literal[NodeType.CALL_EXPR] = Field(alias='NodeType', default=NodeType.CALL_EXPR)
-    fun: Optional[ExprNode] = Field(alias='Fun', default=None)
+    fun: Optional[Node] = Field(alias='Fun', default=None)
     lparen: Optional[PositionNode] = Field(alias='Lparen', default=None)
-    args: Optional[list[ExprNode]] = Field(alias='Args')
+    args: Optional[list[Node]] = Field(alias='Args')
     ellipsis: Optional[PositionNode] = Field(alias='Ellipsis', default=None)
     rparen: Optional[PositionNode] = Field(alias='Rparen', default=None)
 
@@ -389,33 +399,33 @@ class CallExprNode(Node):
         yield from iter_field('rparen', self.rparen)
 
 
-class StarExprNode(Node):
+class StarExprNode(BaseNode):
     node_type: Literal[NodeType.STAR_EXPR] = Field(alias='NodeType', default=NodeType.STAR_EXPR)
     star: Optional[PositionNode] = Field(alias='Star', default=None)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('star', self.star)
         yield from iter_field('x', self.x)
 
 
-class UnaryExprNode(Node):
+class UnaryExprNode(BaseNode):
     node_type: Literal[NodeType.UNARY_EXPR] = Field(alias='NodeType', default=NodeType.UNARY_EXPR)
     op_pos: Optional[PositionNode] = Field(alias='OpPos', default=None)
     op: Optional[str] = Field(alias='Op', default=None)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('op_pos', self.op_pos)
         yield from iter_field('x', self.x)
 
 
-class BinaryExprNode(Node):
+class BinaryExprNode(BaseNode):
     node_type: Literal[NodeType.BINARY_EXPR] = Field(alias='NodeType', default=NodeType.BINARY_EXPR)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
     op_pos: Optional[PositionNode] = Field(alias='OpPos', default=None)
     op: Optional[str] = Field(alias='Op', default=None)
-    y: Optional[ExprNode] = Field(alias='Y', default=None)
+    y: Optional[Node] = Field(alias='Y', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('x', self.x)
@@ -423,11 +433,11 @@ class BinaryExprNode(Node):
         yield from iter_field('y', self.y)
 
 
-class KeyValueExprNode(Node):
+class KeyValueExprNode(BaseNode):
     node_type: Literal[NodeType.KEY_VALUE_EXPR] = Field(alias='NodeType', default=NodeType.KEY_VALUE_EXPR)
-    key: Optional[ExprNode] = Field(alias='Key', default=None)
+    key: Optional[Node] = Field(alias='Key', default=None)
     colon: Optional[PositionNode] = Field(alias='Colon', default=None)
-    value: Optional[ExprNode] = Field(alias='Value', default=None)
+    value: Optional[Node] = Field(alias='Value', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('key', self.key)
@@ -435,11 +445,11 @@ class KeyValueExprNode(Node):
         yield from iter_field('value', self.value)
 
 
-class ArrayTypeNode(Node):
+class ArrayTypeNode(BaseNode):
     node_type: Literal[NodeType.ARRAY_TYPE] = Field(alias='NodeType', default=NodeType.ARRAY_TYPE)
     lbrack: Optional[PositionNode] = Field(alias='Lbrack', default=None)
-    len: Optional[ExprNode] = Field(alias='Len', default=None)
-    elt: Optional[ExprNode] = Field(alias='Elt', default=None)
+    len: Optional[Node] = Field(alias='Len', default=None)
+    elt: Optional[Node] = Field(alias='Elt', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('lbrack', self.lbrack)
@@ -447,7 +457,7 @@ class ArrayTypeNode(Node):
         yield from iter_field('elt', self.elt)
 
 
-class StructTypeNode(Node):
+class StructTypeNode(BaseNode):
     node_type: Literal[NodeType.STRUCT_TYPE] = Field(alias='NodeType', default=NodeType.STRUCT_TYPE)
     struct: Optional[PositionNode] = Field(alias='Struct', default=None)
     fields: Optional[FieldListNode] = Field(alias='Fields', default=None)
@@ -458,7 +468,7 @@ class StructTypeNode(Node):
         yield from iter_field('fields', self.fields)
 
 
-class FuncTypeNode(Node):
+class FuncTypeNode(BaseNode):
     node_type: Literal[NodeType.FUNC_TYPE] = Field(alias='NodeType', default=NodeType.FUNC_TYPE)
     func: Optional[PositionNode] = Field(alias='Func', default=None)
     type_params: Optional[FieldListNode] = Field(alias='TypeParams', default=None)
@@ -472,7 +482,7 @@ class FuncTypeNode(Node):
         yield from iter_field('results', self.results)
 
 
-class InterfaceTypeNode(Node):
+class InterfaceTypeNode(BaseNode):
     node_type: Literal[NodeType.INTERFACE_TYPE] = Field(alias='NodeType', default=NodeType.INTERFACE_TYPE)
     interface: Optional[PositionNode] = Field(alias='Interface', default=None)
     methods: Optional[FieldListNode] = Field(alias='Methods', default=None)
@@ -483,11 +493,11 @@ class InterfaceTypeNode(Node):
         yield from iter_field('methods', self.methods)
 
 
-class MapTypeNode(Node):
+class MapTypeNode(BaseNode):
     node_type: Literal[NodeType.MAP_TYPE] = Field(alias='NodeType', default=NodeType.MAP_TYPE)
     map: Optional[PositionNode] = Field(alias='Map', default=None)
-    key: Optional[ExprNode] = Field(alias='Key', default=None)
-    value: Optional[ExprNode] = Field(alias='Value', default=None)
+    key: Optional[Node] = Field(alias='Key', default=None)
+    value: Optional[Node] = Field(alias='Value', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('map', self.map)
@@ -495,12 +505,12 @@ class MapTypeNode(Node):
         yield from iter_field('value', self.value)
 
 
-class ChanTypeNode(Node):
+class ChanTypeNode(BaseNode):
     node_type: Literal[NodeType.CHAN_TYPE] = Field(alias='NodeType', default=NodeType.CHAN_TYPE)
     begin: Optional[PositionNode] = Field(alias='Begin', default=None)
     arrow: Optional[PositionNode] = Field(alias='Arrow', default=None)
     dir: Optional[str] = Field(alias='Dir', default=None)
-    value: Optional[ExprNode] = Field(alias='Value', default=None)
+    value: Optional[Node] = Field(alias='Value', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('begin', self.begin)
@@ -508,7 +518,7 @@ class ChanTypeNode(Node):
         yield from iter_field('value', self.value)
 
 
-class BadStmtNode(Node):
+class BadStmtNode(BaseNode):
     node_type: Literal[NodeType.BAD_STMT] = Field(alias='NodeType', default=NodeType.BAD_STMT)
     from_pos: Optional[PositionNode] = Field(alias='From', default=None)
     to_pos: Optional[PositionNode] = Field(alias='To', default=None)
@@ -518,15 +528,15 @@ class BadStmtNode(Node):
         yield from iter_field('to_pos', self.to_pos)
 
 
-class DeclStmtNode(Node):
+class DeclStmtNode(BaseNode):
     node_type: Literal[NodeType.DECL_STMT] = Field(alias='NodeType', default=NodeType.DECL_STMT)
-    decl: Optional[DeclNode] = Field(alias='Decl', default=None)
+    decl: Optional[Node] = Field(alias='Decl', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('decl', self.decl)
 
 
-class EmptyStmtNode(Node):
+class EmptyStmtNode(BaseNode):
     node_type: Literal[NodeType.EMPTY_STMT] = Field(alias='NodeType', default=NodeType.EMPTY_STMT)
     semicolon: Optional[PositionNode] = Field(alias='Semicolon', default=None)
     implicit: Optional[bool] = Field(alias='Implicit', default=None)
@@ -535,11 +545,11 @@ class EmptyStmtNode(Node):
         yield from iter_field('semicolon', self.semicolon)
 
 
-class LabeledStmtNode(Node):
+class LabeledStmtNode(BaseNode):
     node_type: Literal[NodeType.LABELED_STMT] = Field(alias='NodeType', default=NodeType.LABELED_STMT)
     label: Optional[IdentNode] = Field(alias='Label', default=None)
     colon: Optional[PositionNode] = Field(alias='Colon', default=None)
-    stmt: Optional[StmtNode] = Field(alias='Stmt', default=None)
+    stmt: Optional[Node] = Field(alias='Stmt', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('label', self.label)
@@ -547,19 +557,19 @@ class LabeledStmtNode(Node):
         yield from iter_field('stmt', self.stmt)
 
 
-class ExprStmtNode(Node):
+class ExprStmtNode(BaseNode):
     node_type: Literal[NodeType.EXPR_STMT] = Field(alias='NodeType', default=NodeType.EXPR_STMT)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('x', self.x)
 
 
-class SendStmtNode(Node):
+class SendStmtNode(BaseNode):
     node_type: Literal[NodeType.SEND_STMT] = Field(alias='NodeType', default=NodeType.SEND_STMT)
-    chan: Optional[ExprNode] = Field(alias='Chan', default=None)
+    chan: Optional[Node] = Field(alias='Chan', default=None)
     arrow: Optional[PositionNode] = Field(alias='Arrow', default=None)
-    value: Optional[ExprNode] = Field(alias='Value', default=None)
+    value: Optional[Node] = Field(alias='Value', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('chan', self.chan)
@@ -567,9 +577,9 @@ class SendStmtNode(Node):
         yield from iter_field('value', self.value)
 
 
-class IncDecStmtNode(Node):
+class IncDecStmtNode(BaseNode):
     node_type: Literal[NodeType.INC_DEC_STMT] = Field(alias='NodeType', default=NodeType.INC_DEC_STMT)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
     tok_pos: Optional[PositionNode] = Field(alias='TokPos', default=None)
     tok: Optional[str] = Field(alias='Tok', default=None)
 
@@ -578,12 +588,12 @@ class IncDecStmtNode(Node):
         yield from iter_field('tok_pos', self.tok_pos)
 
 
-class AssignStmtNode(Node):
+class AssignStmtNode(BaseNode):
     node_type: Literal[NodeType.ASSIGN_STMT] = Field(alias='NodeType', default=NodeType.ASSIGN_STMT)
-    lhs: Optional[list[ExprNode]] = Field(alias='Lhs')
+    lhs: Optional[list[Node]] = Field(alias='Lhs')
     tok_pos: Optional[PositionNode] = Field(alias='TokPos', default=None)
     tok: Optional[str] = Field(alias='Tok', default=None)
-    rhs: Optional[list[ExprNode]] = Field(alias='Rhs')
+    rhs: Optional[list[Node]] = Field(alias='Rhs')
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('lhs', self.lhs)
@@ -591,7 +601,7 @@ class AssignStmtNode(Node):
         yield from iter_field('rhs', self.rhs)
 
 
-class GoStmtNode(Node):
+class GoStmtNode(BaseNode):
     node_type: Literal[NodeType.GO_STMT] = Field(alias='NodeType', default=NodeType.GO_STMT)
     go: Optional[PositionNode] = Field(alias='Go', default=None)
     call: Optional[CallExprNode] = Field(alias='Call', default=None)
@@ -601,7 +611,7 @@ class GoStmtNode(Node):
         yield from iter_field('call', self.call)
 
 
-class DeferStmtNode(Node):
+class DeferStmtNode(BaseNode):
     node_type: Literal[NodeType.DEFER_STMT] = Field(alias='NodeType', default=NodeType.DEFER_STMT)
     defer: Optional[PositionNode] = Field(alias='Defer', default=None)
     call: Optional[CallExprNode] = Field(alias='Call', default=None)
@@ -611,17 +621,17 @@ class DeferStmtNode(Node):
         yield from iter_field('call', self.call)
 
 
-class ReturnStmtNode(Node):
+class ReturnStmtNode(BaseNode):
     node_type: Literal[NodeType.RETURN_STMT] = Field(alias='NodeType', default=NodeType.RETURN_STMT)
     return_pos: Optional[PositionNode] = Field(alias='Return', default=None)
-    results: Optional[list[ExprNode]] = Field(alias='Results')
+    results: Optional[list[Node]] = Field(alias='Results')
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('return_pos', self.return_pos)
         yield from iter_field('results', self.results)
 
 
-class BranchStmtNode(Node):
+class BranchStmtNode(BaseNode):
     node_type: Literal[NodeType.BRANCH_STMT] = Field(alias='NodeType', default=NodeType.BRANCH_STMT)
     tok_pos: Optional[PositionNode] = Field(alias='TokPos', default=None)
     tok: Optional[str] = Field(alias='Tok', default=None)
@@ -632,10 +642,10 @@ class BranchStmtNode(Node):
         yield from iter_field('label', self.label)
 
 
-class BlockStmtNode(Node):
+class BlockStmtNode(BaseNode):
     node_type: Literal[NodeType.BLOCK_STMT] = Field(alias='NodeType', default=NodeType.BLOCK_STMT)
     lbrace: Optional[PositionNode] = Field(alias='Lbrace', default=None)
-    stmt_list: Optional[list[StmtNode]] = Field(alias='List')
+    stmt_list: Optional[list[Node]] = Field(alias='List')
     rbrace: Optional[PositionNode] = Field(alias='Rbrace', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -644,13 +654,13 @@ class BlockStmtNode(Node):
         yield from iter_field('rbrace', self.rbrace)
 
 
-class IfStmtNode(Node):
+class IfStmtNode(BaseNode):
     node_type: Literal[NodeType.IF_STMT] = Field(alias='NodeType', default=NodeType.IF_STMT)
     if_pos: Optional[PositionNode] = Field(alias='If', default=None)
-    init: Optional[StmtNode] = Field(alias='Init', default=None)
-    cond: Optional[ExprNode] = Field(alias='Cond', default=None)
+    init: Optional[Node] = Field(alias='Init', default=None)
+    cond: Optional[Node] = Field(alias='Cond', default=None)
     body: Optional[BlockStmtNode] = Field(alias='Body', default=None)
-    else_pos: Optional[StmtNode] = Field(alias='Else', default=None)
+    else_pos: Optional[Node] = Field(alias='Else', default=None)
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('if_pos', self.if_pos)
@@ -660,12 +670,12 @@ class IfStmtNode(Node):
         yield from iter_field('else_pos', self.else_pos)
 
 
-class CaseClauseNode(Node):
+class CaseClauseNode(BaseNode):
     node_type: Literal[NodeType.CASE_CLAUSE] = Field(alias='NodeType', default=NodeType.CASE_CLAUSE)
     case_pos: Optional[PositionNode] = Field(alias='Case', default=None)
-    expr_list: Optional[list[ExprNode]] = Field(alias='List')
+    expr_list: Optional[list[Node]] = Field(alias='List')
     colon: Optional[PositionNode] = Field(alias='Colon', default=None)
-    body: Optional[list[StmtNode]] = Field(alias='Body')
+    body: Optional[list[Node]] = Field(alias='Body')
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('case_pos', self.case_pos)
@@ -674,11 +684,11 @@ class CaseClauseNode(Node):
         yield from iter_field('body', self.body)
 
 
-class SwitchStmtNode(Node):
+class SwitchStmtNode(BaseNode):
     node_type: Literal[NodeType.SWITCH_STMT] = Field(alias='NodeType', default=NodeType.SWITCH_STMT)
     switch: Optional[PositionNode] = Field(alias='Switch', default=None)
-    init: Optional[StmtNode] = Field(alias='Init', default=None)
-    tag: Optional[ExprNode] = Field(alias='Tag', default=None)
+    init: Optional[Node] = Field(alias='Init', default=None)
+    tag: Optional[Node] = Field(alias='Tag', default=None)
     body: Optional[BlockStmtNode] = Field(alias='Body', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -688,11 +698,11 @@ class SwitchStmtNode(Node):
         yield from iter_field('body', self.body)
 
 
-class TypeSwitchStmtNode(Node):
+class TypeSwitchStmtNode(BaseNode):
     node_type: Literal[NodeType.TYPE_SWITCH_STMT] = Field(alias='NodeType', default=NodeType.TYPE_SWITCH_STMT)
     switch: Optional[PositionNode] = Field(alias='Switch', default=None)
-    init: Optional[StmtNode] = Field(alias='Init', default=None)
-    assign: Optional[StmtNode] = Field(alias='Assign', default=None)
+    init: Optional[Node] = Field(alias='Init', default=None)
+    assign: Optional[Node] = Field(alias='Assign', default=None)
     body: Optional[BlockStmtNode] = Field(alias='Body', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -702,12 +712,12 @@ class TypeSwitchStmtNode(Node):
         yield from iter_field('body', self.body)
 
 
-class CommClauseNode(Node):
+class CommClauseNode(BaseNode):
     node_type: Literal[NodeType.COMM_CLAUSE] = Field(alias='NodeType', default=NodeType.COMM_CLAUSE)
     case_pos: Optional[PositionNode] = Field(alias='Case', default=None)
-    comm: Optional[StmtNode] = Field(alias='Comm', default=None)
+    comm: Optional[Node] = Field(alias='Comm', default=None)
     colon: Optional[PositionNode] = Field(alias='Colon', default=None)
-    body: Optional[list[StmtNode]] = Field(alias='Body')
+    body: Optional[list[Node]] = Field(alias='Body')
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('case_pos', self.case_pos)
@@ -716,7 +726,7 @@ class CommClauseNode(Node):
         yield from iter_field('body', self.body)
 
 
-class SelectStmtNode(Node):
+class SelectStmtNode(BaseNode):
     node_type: Literal[NodeType.SELECT_STMT] = Field(alias='NodeType', default=NodeType.SELECT_STMT)
     select: Optional[PositionNode] = Field(alias='Select', default=None)
     body: Optional[BlockStmtNode] = Field(alias='Body', default=None)
@@ -726,12 +736,12 @@ class SelectStmtNode(Node):
         yield from iter_field('body', self.body)
 
 
-class ForStmtNode(Node):
+class ForStmtNode(BaseNode):
     node_type: Literal[NodeType.FOR_STMT] = Field(alias='NodeType', default=NodeType.FOR_STMT)
     for_pos: Optional[PositionNode] = Field(alias='For', default=None)
-    init: Optional[StmtNode] = Field(alias='Init', default=None)
-    cond: Optional[ExprNode] = Field(alias='Cond', default=None)
-    post: Optional[StmtNode] = Field(alias='Post', default=None)
+    init: Optional[Node] = Field(alias='Init', default=None)
+    cond: Optional[Node] = Field(alias='Cond', default=None)
+    post: Optional[Node] = Field(alias='Post', default=None)
     body: Optional[BlockStmtNode] = Field(alias='Body', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -742,14 +752,14 @@ class ForStmtNode(Node):
         yield from iter_field('body', self.body)
 
 
-class RangeStmtNode(Node):
+class RangeStmtNode(BaseNode):
     node_type: Literal[NodeType.RANGE_STMT] = Field(alias='NodeType', default=NodeType.RANGE_STMT)
     for_pos: Optional[PositionNode] = Field(alias='For', default=None)
-    key: Optional[ExprNode] = Field(alias='Key', default=None)
-    value: Optional[ExprNode] = Field(alias='Value', default=None)
+    key: Optional[Node] = Field(alias='Key', default=None)
+    value: Optional[Node] = Field(alias='Value', default=None)
     tok_pos: Optional[PositionNode] = Field(alias='TokPos', default=None)
     tok: Optional[str] = Field(alias='Tok', default=None)
-    x: Optional[ExprNode] = Field(alias='X', default=None)
+    x: Optional[Node] = Field(alias='X', default=None)
     body: Optional[BlockStmtNode] = Field(alias='Body', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -761,7 +771,7 @@ class RangeStmtNode(Node):
         yield from iter_field('body', self.body)
 
 
-class ImportSpecNode(Node):
+class ImportSpecNode(BaseNode):
     node_type: Literal[NodeType.IMPORT_SPEC] = Field(alias='NodeType', default=NodeType.IMPORT_SPEC)
     doc: Optional[CommentGroupNode] = Field(alias='Doc', default=None)
     name: Optional[IdentNode] = Field(alias='Name', default=None)
@@ -777,12 +787,12 @@ class ImportSpecNode(Node):
         yield from iter_field('end_pos', self.end_pos)
 
 
-class ValueSpecNode(Node):
+class ValueSpecNode(BaseNode):
     node_type: Literal[NodeType.VALUE_SPEC] = Field(alias='NodeType', default=NodeType.VALUE_SPEC)
     doc: Optional[CommentGroupNode] = Field(alias='Doc', default=None)
     names: Optional[list[IdentNode]] = Field(alias='Names')
-    type: Optional[ExprNode] = Field(alias='Type', default=None)
-    values: Optional[list[ExprNode]] = Field(alias='Values')
+    type: Optional[Node] = Field(alias='Type', default=None)
+    values: Optional[list[Node]] = Field(alias='Values')
     comment: Optional[CommentGroupNode] = Field(alias='Comment', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -793,13 +803,13 @@ class ValueSpecNode(Node):
         yield from iter_field('comment', self.comment)
 
 
-class TypeSpecNode(Node):
+class TypeSpecNode(BaseNode):
     node_type: Literal[NodeType.TYPE_SPEC] = Field(alias='NodeType', default=NodeType.TYPE_SPEC)
     doc: Optional[CommentGroupNode] = Field(alias='Doc', default=None)
     name: Optional[IdentNode] = Field(alias='Name', default=None)
     type_params: Optional[FieldListNode] = Field(alias='TypeParams', default=None)
     assign: Optional[PositionNode] = Field(alias='Assign', default=None)
-    type: Optional[ExprNode] = Field(alias='Type', default=None)
+    type: Optional[Node] = Field(alias='Type', default=None)
     comment: Optional[CommentGroupNode] = Field(alias='Comment', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -811,7 +821,7 @@ class TypeSpecNode(Node):
         yield from iter_field('comment', self.comment)
 
 
-class BadDeclNode(Node):
+class BadDeclNode(BaseNode):
     node_type: Literal[NodeType.BAD_DECL] = Field(alias='NodeType', default=NodeType.BAD_DECL)
     from_pos: Optional[PositionNode] = Field(alias='From', default=None)
     to_pos: Optional[PositionNode] = Field(alias='To', default=None)
@@ -821,13 +831,13 @@ class BadDeclNode(Node):
         yield from iter_field('to_pos', self.to_pos)
 
 
-class GenDeclNode(Node):
+class GenDeclNode(BaseNode):
     node_type: Literal[NodeType.GEN_DECL] = Field(alias='NodeType', default=NodeType.GEN_DECL)
     doc: Optional[CommentGroupNode] = Field(alias='Doc', default=None)
     tok_pos: Optional[PositionNode] = Field(alias='TokPos', default=None)
     tok: Optional[str] = Field(alias='Tok', default=None)
     lparen: Optional[PositionNode] = Field(alias='Lparen', default=None)
-    specs: Optional[list[SpecNode]] = Field(alias='Specs')
+    specs: Optional[list[Node]] = Field(alias='Specs')
     rparen: Optional[PositionNode] = Field(alias='Rparen', default=None)
 
     def iterate_children(self) -> FieldSequence:
@@ -838,7 +848,7 @@ class GenDeclNode(Node):
         yield from iter_field('rparen', self.rparen)
 
 
-class FuncDeclNode(Node):
+class FuncDeclNode(BaseNode):
     node_type: Literal[NodeType.FUNC_DECL] = Field(alias='NodeType', default=NodeType.FUNC_DECL)
     doc: Optional[CommentGroupNode] = Field(alias='Doc', default=None)
     recv: Optional[FieldListNode] = Field(alias='Recv', default=None)
@@ -854,12 +864,12 @@ class FuncDeclNode(Node):
         yield from iter_field('body', self.body)
 
 
-class FileNode(Node):
+class FileNode(BaseNode):
     node_type: Literal[NodeType.FILE] = Field(alias='NodeType', default=NodeType.FILE)
     doc: Optional[CommentGroupNode] = Field(alias='Doc', default=None)
     package: Optional[PositionNode] = Field(alias='Package', default=None)
     name: Optional[IdentNode] = Field(alias='Name', default=None)
-    decls: Optional[list[DeclNode]] = Field(alias='Decls')
+    decls: Optional[list[Node]] = Field(alias='Decls')
     imports: Optional[list[ImportSpecNode]] = Field(alias='Imports')
     unresolved: Optional[list[IdentNode]] = Field(alias='Unresolved')
     comments: Optional[list[CommentGroupNode]] = Field(alias='Comments')
@@ -875,7 +885,7 @@ class FileNode(Node):
         yield from iter_field('comments', self.comments)
 
 
-class PackageNode(Node):
+class PackageNode(BaseNode):
     node_type: Literal[NodeType.PACKAGE] = Field(alias='NodeType', default=NodeType.PACKAGE)
     name: Optional[str] = Field(alias='Name', default=None)
     # scope: Optional[Scope] = Field(alias='Scope', default=None)
@@ -883,11 +893,28 @@ class PackageNode(Node):
     files: Optional[dict[str, FileNode]] = Field(alias='Files')
 
     def iterate_children(self) -> FieldSequence:
-        yield from iter_field('name', self.name)
         yield from iter_field('files', self.files)
 
 
-Node.update_forward_refs()
+class MatchOperatorType(str, Enum):
+    ANY_OF = 'anyOf'
+    ALL_OF = 'allOf'
+    ONE_OF = 'oneOf'
+    NOT = 'not'
+
+
+class MatchRuleNode(BaseNode):
+    node_type: Literal[NodeType.MATCH_RULE] = Field(alias='NodeType', default=NodeType.MATCH_RULE)
+    name: str = Field(alias='Name')
+    rules: list[Node] = Field(alias='Rules', default_factory=list)
+    exact: bool = Field(alias='Exact', default=False)
+    operator: MatchOperatorType = Field(alias='Operator', default=MatchOperatorType.ANY_OF)
+
+    def iterate_children(self) -> FieldSequence:
+        yield from iter_field('rules', self.rules)
+
+
+BaseNode.update_forward_refs()
 PositionNode.update_forward_refs()
 CommentNode.update_forward_refs()
 CommentGroupNode.update_forward_refs()
