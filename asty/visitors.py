@@ -132,6 +132,7 @@ class Matcher:
 
     def _single_match(self, node: BaseNode) -> Result:
         assert isinstance(self.pattern, MatchRuleNode)
+        # TODO: add operator usage
         for rule in self.pattern.rules:
             sub_matcher = self.make_matcher(rule, self.pattern.name)
             if sub_match := sub_matcher.match(node):
