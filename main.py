@@ -1,4 +1,6 @@
-from devtools import pprint
+from devtools import (
+    pprint,
+)
 
 from asty.nodes import (
     BasicLitNode,
@@ -62,8 +64,8 @@ if __name__ == '__main__':
     # pprint(tree)
 
     matcher = Matcher(pattern)
-    matcher.match(tree)
-    pprint(matcher)
+    match = matcher.match(tree)
+    pprint(match)
 
     # output = "/Users/evgenus/tfc/asty/output-processed.json"
     # data = tree.json(
