@@ -91,6 +91,7 @@ FieldSequence = Iterable[tuple[str, NodeOrSequence]]
 
 class BaseNode(BaseModel, ABC):
     node_type: NodeType = Field(alias='NodeType')
+    ref_id: Optional[int] = Field(alias='RefId')
 
     @abstractmethod
     def iterate_children(self) -> FieldSequence:
@@ -864,15 +865,36 @@ class FuncDeclNode(BaseNode):
         yield from iter_field('body', self.body)
 
 
+class LineInfo(BaseModel):
+    offset: int = Field(alias='Offset')
+    filename: str = Field(alias='Filename')
+    line: int = Field(alias='Line')
+    column: int = Field(alias='Column')
+
+
+class File(BaseModel):
+    name: str = Field(alias='Name')
+    base: int = Field(alias='Base')
+    size: int = Field(alias='Size')
+    lines: Optional[list[int]] = Field(alias='Lines', default=None)
+    infos: Optional[list[int]] = Field(alias='Infos', default=None)
+
+
+class FileSet(BaseModel):
+    base: int = Field(alias='Base')
+    files: list[File] = Field(alias='Files')
+
+
 class FileNode(BaseNode):
     node_type: Literal[NodeType.FILE] = Field(alias='NodeType', default=NodeType.FILE)
     doc: Optional[CommentGroupNode] = Field(alias='Doc', default=None)
     package: Optional[PositionNode] = Field(alias='Package', default=None)
     name: Optional[IdentNode] = Field(alias='Name', default=None)
     decls: Optional[list[Node]] = Field(alias='Decls')
-    imports: Optional[list[ImportSpecNode]] = Field(alias='Imports')
-    unresolved: Optional[list[IdentNode]] = Field(alias='Unresolved')
-    comments: Optional[list[CommentGroupNode]] = Field(alias='Comments')
+    imports: Optional[list[ImportSpecNode]] = Field(alias='Imports', default=None)
+    unresolved: Optional[list[IdentNode]] = Field(alias='Unresolved', default=None)
+    comments: Optional[list[CommentGroupNode]] = Field(alias='Comments', default=None)
+    file_set: Optional[FileSet] = Field(alias='FileSet', default=None)
     # scope: Optional[Scope] = Field(alias='Scope', default=None)
 
     def iterate_children(self) -> FieldSequence:
