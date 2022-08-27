@@ -10,9 +10,11 @@ def _serialize_volumes(volumes: dict[str, str]):
         yield f'{k}:{v}'
 
 
-def run_with_container(volumes: dict[str, str], cmd: list[str]):
+def run_with_container(cmd: list[str], volumes: dict[str, str] = None, input: str = None):
+    if volumes is None:
+        volumes = {}
     query = [
-        "docker", "run", "-it",
+        "docker", "run", "-i",
         *_serialize_volumes(volumes),
         ASTY_DOCKER_IMAGE,
         *cmd,
@@ -22,6 +24,7 @@ def run_with_container(volumes: dict[str, str], cmd: list[str]):
         query,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        input=input,
     )
 
 
