@@ -7,8 +7,6 @@ from typing import (
     Sequence,
 )
 
-from devtools import sformat
-
 from asty.nodes import (
     BaseNode,
     MatchRuleNode,
@@ -88,6 +86,8 @@ class MatchingResult:
         return self
 
     def __pretty__(self, fmt, **_kwargs):
+        from devtools import sformat
+
         yield sformat('MatchingResult', sformat.bold) + '('
         yield 1
         yield 'context='
