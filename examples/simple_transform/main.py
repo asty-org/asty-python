@@ -10,7 +10,7 @@ from asty.utils import run_with_container
 from asty.visitors import NodeTransformer
 
 
-class TestTransformer(NodeTransformer):
+class SampleTransformer(NodeTransformer):
     def visit_CallExprNode(self, node):
         match node:
             case CallExprNode(
@@ -30,7 +30,7 @@ class TestTransformer(NodeTransformer):
 def main():
     root = os.path.dirname(__file__)
     result = run_with_container(
-        ["go2json", "-input", "/var/data/test.go"],
+        ["go2json", "-input", "/var/data/sample.go"],
         volumes={root: "/var/data"},
     )
     if result.returncode != 0:
@@ -38,7 +38,7 @@ def main():
 
     tree = FileNode.parse_raw(result.stdout)
 
-    transformer = TestTransformer()
+    transformer = SampleTransformer()
     tree = transformer.visit(tree)
 
     data = tree.json(

@@ -11,7 +11,7 @@ from asty.utils import run_with_container
 from asty.visitors import NodeVisitor
 
 
-class TestVisitor(NodeVisitor):
+class SampleVisitor(NodeVisitor):
     def visit_CallExprNode(self, node):
         match node:
             case CallExprNode(
@@ -34,7 +34,7 @@ class TestVisitor(NodeVisitor):
 def main():
     root = os.path.dirname(__file__)
     result = run_with_container(
-        ["go2json", "-input", "/var/data/test.go"],
+        ["go2json", "-input", "/var/data/sample.go"],
         volumes={root: "/var/data"},
     )
     if result.returncode != 0:
@@ -42,7 +42,7 @@ def main():
 
     tree = FileNode.parse_raw(result.stdout)
 
-    visitor = TestVisitor()
+    visitor = SampleVisitor()
     visitor.visit(tree)
 
 

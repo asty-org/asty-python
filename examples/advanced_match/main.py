@@ -17,7 +17,7 @@ def main():
     pattern = MatchRuleNode.parse_raw(data)
 
     result = run_with_container(
-        ["go2json", "-positions", "-input", "/var/data/test.go"],
+        ["go2json", "-positions", "-input", "/var/data/sample.go"],
         volumes={root: "/var/data"},
     )
     if result.returncode != 0:
