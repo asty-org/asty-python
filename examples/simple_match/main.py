@@ -34,8 +34,8 @@ class TestVisitor(NodeVisitor):
 def main():
     root = os.path.dirname(__file__)
     result = run_with_container(
-        {root: "/var/data"},
         ["go2json", "-input", "/var/data/test.go"],
+        volumes={root: "/var/data"},
     )
     if result.returncode != 0:
         raise Exception(result.stderr.decode("utf-8"))
