@@ -1,0 +1,25 @@
+{
+  "NodeType": "MatchRule",
+  "Name": "call",
+  "Rules": [
+    {
+      "NodeType": "CallExpr",
+      "Fun": {
+        "NodeType": "Ident",
+        "Name": "print"
+      },
+      "Args": [
+        {
+          "NodeType": "MatchRule",
+          "Name": "constant",
+          "Rules": [
+            {
+              "NodeType": "BasicLit",
+              "Kind": "STRING"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

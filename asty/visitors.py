@@ -81,6 +81,11 @@ class MatchingResult:
         self.context = context
         self.matches: list['MatchingResult'] = []
 
+    def __getitem__(self, key: str):
+        for match in self.matches:
+            if match.context == key:
+                yield match
+
     def attach(self, *sub_match: 'MatchingResult'):
         self.matches.extend(sub_match)
         return self
