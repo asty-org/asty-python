@@ -29,12 +29,12 @@ def main():
     match = matcher.match(tree)
 
     for result in match:
-        for calls in result['call']:
-            for fun in calls['fun']:
+        for call in result['call']:
+            for fun in call['fun']:
                 assert isinstance(fun.node, IdentNode)
                 pos = fun.node.name_pos
                 print(fun.node.name, f'{pos.filename}:{pos.line}:{pos.column}')
-            for args in calls['args']:
+            for args in call['args']:
                 for const in args['constant']:
                     assert isinstance(const.node, BasicLitNode)
                     pos = const.node.value_pos

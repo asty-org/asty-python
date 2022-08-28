@@ -9,7 +9,7 @@ python pattern matching.
 2. Create visitor that searches for `fmt.Println` calls with first parameter as string constant.
 3. Apply visitor to parsed AST and print found parameters.
 
-### Further evolution
+### Motivation
 
 With this approach you can find static patterns in AST that you can fit into single python match.
 If you need to search for more complicated things you can use nested visitors or 
