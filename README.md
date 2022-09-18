@@ -1,6 +1,6 @@
 # asty python library
 
-[![GitHub last commit](https://img.shields.io/github/last-commit/asty-org/asty)](https://github.com/asty-org/asty)
+[![GitHub last commit](https://img.shields.io/github/last-commit/asty-org/asty-python)](https://github.com/asty-org/asty-python)
 
 Python interface for [asty](https://github.com/asty-org/asty). 
 Provides set of pydantic models and utilities for working with golang AST 
