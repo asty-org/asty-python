@@ -86,6 +86,9 @@ class MatchingResult:
             if match.context == key:
                 yield match
 
+    def keys(self):
+        return [match.context for match in self.matches]
+
     def attach(self, *sub_match: 'MatchingResult'):
         self.matches.extend(sub_match)
         return self
