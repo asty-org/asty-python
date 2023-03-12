@@ -202,7 +202,7 @@ class CommentNode(BaseNode):
 
 class CommentGroupNode(BaseNode):
     node_type: Literal[NodeType.COMMENT_GROUP] = Field(alias='NodeType', default=NodeType.COMMENT_GROUP)
-    comment_list: Optional[list[CommentNode]] = Field(alias='List')
+    comment_list: Optional[list[Node]] = Field(alias='List')
 
     def iterate_children(self):
         yield from iter_field('comment_list', self.comment_list)
@@ -227,7 +227,7 @@ class FieldNode(BaseNode):
 class FieldListNode(BaseNode):
     node_type: Literal[NodeType.FIELD_LIST] = Field(alias='NodeType', default=NodeType.FIELD_LIST)
     opening: Optional[PositionNode] = Field(alias='Opening', default=None)
-    field_list: Optional[list[FieldNode]] = Field(alias='List')
+    field_list: Optional[list[Node]] = Field(alias='List')
     closing: Optional[PositionNode] = Field(alias='Closing', default=None)
 
     def iterate_children(self) -> FieldSequence:
