@@ -15,7 +15,10 @@ from typing import (
 from pydantic import (
     BaseModel,
     Field,
+    validator,
 )
+
+from .features import analyze_function_bodies
 
 
 class NodeType(str, Enum):
@@ -280,6 +283,12 @@ class FuncLitNode(BaseNode):
     node_type: Literal[NodeType.FUNC_LIT] = Field(alias='NodeType', default=NodeType.FUNC_LIT)
     type: Optional['FuncTypeNode'] = Field(alias='Type', default=None)
     body: Optional['BlockStmtNode'] = Field(alias='Body', default=None)
+
+    @validator("body", pre=True)
+    def validate_body(cls, value):
+        if not analyze_function_bodies.get():
+            return None
+        return value
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('type', self.type)
@@ -856,6 +865,12 @@ class FuncDeclNode(BaseNode):
     name: Optional[IdentNode] = Field(alias='Name', default=None)
     type: Optional[FuncTypeNode] = Field(alias='Type', default=None)
     body: Optional[BlockStmtNode] = Field(alias='Body', default=None)
+
+    @validator("body", pre=True)
+    def validate_body(cls, value):
+        if not analyze_function_bodies.get():
+            return None
+        return value
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('doc', self.doc)
