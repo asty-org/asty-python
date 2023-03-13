@@ -84,6 +84,7 @@ class NodeType(str, Enum):
     def __repr__(self):
         return f"{self.__class__.__name__}.{self.name}"
 
+    # noinspection PyUnusedLocal
     def __pretty__(self, fmt, skip_exc):
         return repr(self)
 
@@ -98,6 +99,11 @@ class BaseNode(BaseModel, ABC):
 
     @abstractmethod
     def iterate_children(self) -> FieldSequence:
+        ...
+
+    @property
+    @abstractmethod
+    def position(self) -> Optional['PositionNode']:
         ...
 
     @classmethod
@@ -190,6 +196,22 @@ class PositionNode(BaseNode):
     line: Optional[int] = Field(alias='Line', default=None)
     column: Optional[int] = Field(alias='Column', default=None)
 
+    @property
+    def short_location(self):
+        if self.filename is None or self.offset is None:
+            return None
+        return f"{self.filename}:{self.offset}"
+
+    @property
+    def full_location(self):
+        if self.short_location is None or self.column is None:
+            return None
+        return f"{self.short_location}:{self.offset}"
+
+    @property
+    def position(self):
+        return self
+
     def iterate_children(self) -> FieldSequence:
         yield from ()
 
@@ -202,6 +224,10 @@ class CommentNode(BaseNode):
     def iterate_children(self):
         yield from iter_field('slash', self.slash)
 
+    @property
+    def position(self):
+        return self.slash
+
 
 class CommentGroupNode(BaseNode):
     node_type: Literal[NodeType.COMMENT_GROUP] = Field(alias='NodeType', default=NodeType.COMMENT_GROUP)
@@ -209,6 +235,11 @@ class CommentGroupNode(BaseNode):
 
     def iterate_children(self):
         yield from iter_field('comment_list', self.comment_list)
+
+    @property
+    def position(self):
+        if self.comment_list:
+            return self.comment_list[0].position
 
 
 class FieldNode(BaseNode):
@@ -226,6 +257,11 @@ class FieldNode(BaseNode):
         yield from iter_field('tag', self.tag)
         yield from iter_field('comment', self.comment)
 
+    @property
+    def position(self):
+        if self.names:
+            return self.names[0].position
+
 
 class FieldListNode(BaseNode):
     node_type: Literal[NodeType.FIELD_LIST] = Field(alias='NodeType', default=NodeType.FIELD_LIST)
@@ -238,6 +274,10 @@ class FieldListNode(BaseNode):
         yield from iter_field('field_list', self.field_list)
         yield from iter_field('closing', self.closing)
 
+    @property
+    def position(self):
+        return self.opening
+
 
 class BadExprNode(BaseNode):
     node_type: Literal[NodeType.BAD_EXPR] = Field(alias='NodeType', default=NodeType.BAD_EXPR)
@@ -247,6 +287,10 @@ class BadExprNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('from_pos', self.from_pos)
         yield from iter_field('to_pos', self.to_pos)
+
+    @property
+    def position(self):
+        return self.from_pos
 
 
 class IdentNode(BaseNode):
@@ -258,6 +302,10 @@ class IdentNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('name_pos', self.name_pos)
 
+    @property
+    def position(self):
+        return self.name_pos
+
 
 class EllipsisNode(BaseNode):
     node_type: Literal[NodeType.ELLIPSIS] = Field(alias='NodeType', default=NodeType.ELLIPSIS)
@@ -268,6 +316,10 @@ class EllipsisNode(BaseNode):
         yield from iter_field('ellipsis', self.ellipsis)
         yield from iter_field('elt', self.elt)
 
+    @property
+    def position(self):
+        return self.ellipsis
+
 
 class BasicLitNode(BaseNode):
     node_type: Literal[NodeType.BASIC_LIT] = Field(alias='NodeType', default=NodeType.BASIC_LIT)
@@ -277,6 +329,10 @@ class BasicLitNode(BaseNode):
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('value_pos', self.value_pos)
+
+    @property
+    def position(self):
+        return self.value_pos
 
 
 class FuncLitNode(BaseNode):
@@ -294,6 +350,11 @@ class FuncLitNode(BaseNode):
         yield from iter_field('type', self.type)
         yield from iter_field('body', self.body)
 
+    @property
+    def position(self):
+        if self.type:
+            return self.type.position
+
 
 class CompositeLitNode(BaseNode):
     node_type: Literal[NodeType.COMPOSITE_LIT] = Field(alias='NodeType', default=NodeType.COMPOSITE_LIT)
@@ -309,6 +370,11 @@ class CompositeLitNode(BaseNode):
         yield from iter_field('elts', self.elts)
         yield from iter_field('rbrace', self.rbrace)
 
+    @property
+    def position(self):
+        if self.type:
+            return self.type.position
+
 
 class ParenExprNode(BaseNode):
     node_type: Literal[NodeType.PAREN_EXPR] = Field(alias='NodeType', default=NodeType.PAREN_EXPR)
@@ -321,6 +387,10 @@ class ParenExprNode(BaseNode):
         yield from iter_field('x', self.x)
         yield from iter_field('rparen', self.rparen)
 
+    @property
+    def position(self):
+        return self.lparen
+
 
 class SelectorExprNode(BaseNode):
     node_type: Literal[NodeType.SELECTOR_EXPR] = Field(alias='NodeType', default=NodeType.SELECTOR_EXPR)
@@ -330,6 +400,11 @@ class SelectorExprNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('x', self.x)
         yield from iter_field('sel', self.sel)
+
+    @property
+    def position(self):
+        if self.x:
+            return self.x.position
 
 
 class IndexExprNode(BaseNode):
@@ -345,6 +420,11 @@ class IndexExprNode(BaseNode):
         yield from iter_field('index', self.index)
         yield from iter_field('rbrack', self.rbrack)
 
+    @property
+    def position(self):
+        if self.x:
+            return self.x.position
+
 
 class IndexListExprNode(BaseNode):
     node_type: Literal[NodeType.INDEX_LIST_EXPR] = Field(alias='NodeType', default=NodeType.INDEX_LIST_EXPR)
@@ -358,6 +438,11 @@ class IndexListExprNode(BaseNode):
         yield from iter_field('lbrack', self.lbrack)
         yield from iter_field('indices', self.indices)
         yield from iter_field('rbrack', self.rbrack)
+
+    @property
+    def position(self):
+        if self.x:
+            return self.x.position
 
 
 class SliceExprNode(BaseNode):
@@ -378,6 +463,11 @@ class SliceExprNode(BaseNode):
         yield from iter_field('max', self.max)
         yield from iter_field('rbrack', self.rbrack)
 
+    @property
+    def position(self):
+        if self.x:
+            return self.x.position
+
 
 class TypeAssertExprNode(BaseNode):
     node_type: Literal[NodeType.TYPE_ASSERT_EXPR] = Field(alias='NodeType', default=NodeType.TYPE_ASSERT_EXPR)
@@ -391,6 +481,11 @@ class TypeAssertExprNode(BaseNode):
         yield from iter_field('lparen', self.lparen)
         yield from iter_field('type', self.type)
         yield from iter_field('rparen', self.rparen)
+
+    @property
+    def position(self):
+        if self.x:
+            return self.x.position
 
 
 class CallExprNode(BaseNode):
@@ -408,6 +503,11 @@ class CallExprNode(BaseNode):
         yield from iter_field('ellipsis', self.ellipsis)
         yield from iter_field('rparen', self.rparen)
 
+    @property
+    def position(self):
+        if self.fun:
+            return self.fun.position
+
 
 class StarExprNode(BaseNode):
     node_type: Literal[NodeType.STAR_EXPR] = Field(alias='NodeType', default=NodeType.STAR_EXPR)
@@ -417,6 +517,10 @@ class StarExprNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('star', self.star)
         yield from iter_field('x', self.x)
+
+    @property
+    def position(self):
+        return self.star
 
 
 class UnaryExprNode(BaseNode):
@@ -428,6 +532,10 @@ class UnaryExprNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('op_pos', self.op_pos)
         yield from iter_field('x', self.x)
+
+    @property
+    def position(self):
+        return self.op_pos
 
 
 class BinaryExprNode(BaseNode):
@@ -442,6 +550,11 @@ class BinaryExprNode(BaseNode):
         yield from iter_field('op_pos', self.op_pos)
         yield from iter_field('y', self.y)
 
+    @property
+    def position(self):
+        if self.x:
+            return self.x.position
+
 
 class KeyValueExprNode(BaseNode):
     node_type: Literal[NodeType.KEY_VALUE_EXPR] = Field(alias='NodeType', default=NodeType.KEY_VALUE_EXPR)
@@ -453,6 +566,11 @@ class KeyValueExprNode(BaseNode):
         yield from iter_field('key', self.key)
         yield from iter_field('colon', self.colon)
         yield from iter_field('value', self.value)
+
+    @property
+    def position(self):
+        if self.key:
+            return self.key.position
 
 
 class ArrayTypeNode(BaseNode):
@@ -466,6 +584,10 @@ class ArrayTypeNode(BaseNode):
         yield from iter_field('len', self.len)
         yield from iter_field('elt', self.elt)
 
+    @property
+    def position(self):
+        return self.lbrack
+
 
 class StructTypeNode(BaseNode):
     node_type: Literal[NodeType.STRUCT_TYPE] = Field(alias='NodeType', default=NodeType.STRUCT_TYPE)
@@ -476,6 +598,10 @@ class StructTypeNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('struct', self.struct)
         yield from iter_field('fields', self.fields)
+
+    @property
+    def position(self):
+        return self.struct
 
 
 class FuncTypeNode(BaseNode):
@@ -491,6 +617,10 @@ class FuncTypeNode(BaseNode):
         yield from iter_field('params', self.params)
         yield from iter_field('results', self.results)
 
+    @property
+    def position(self):
+        return self.func
+
 
 class InterfaceTypeNode(BaseNode):
     node_type: Literal[NodeType.INTERFACE_TYPE] = Field(alias='NodeType', default=NodeType.INTERFACE_TYPE)
@@ -501,6 +631,10 @@ class InterfaceTypeNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('interface', self.interface)
         yield from iter_field('methods', self.methods)
+
+    @property
+    def position(self):
+        return self.interface
 
 
 class MapTypeNode(BaseNode):
@@ -513,6 +647,10 @@ class MapTypeNode(BaseNode):
         yield from iter_field('map', self.map)
         yield from iter_field('key', self.key)
         yield from iter_field('value', self.value)
+
+    @property
+    def position(self):
+        return self.map
 
 
 class ChanTypeNode(BaseNode):
@@ -527,6 +665,10 @@ class ChanTypeNode(BaseNode):
         yield from iter_field('arrow', self.arrow)
         yield from iter_field('value', self.value)
 
+    @property
+    def position(self):
+        return self.begin
+
 
 class BadStmtNode(BaseNode):
     node_type: Literal[NodeType.BAD_STMT] = Field(alias='NodeType', default=NodeType.BAD_STMT)
@@ -537,6 +679,10 @@ class BadStmtNode(BaseNode):
         yield from iter_field('from_pos', self.from_pos)
         yield from iter_field('to_pos', self.to_pos)
 
+    @property
+    def position(self):
+        return self.from_pos
+
 
 class DeclStmtNode(BaseNode):
     node_type: Literal[NodeType.DECL_STMT] = Field(alias='NodeType', default=NodeType.DECL_STMT)
@@ -544,6 +690,11 @@ class DeclStmtNode(BaseNode):
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('decl', self.decl)
+
+    @property
+    def position(self):
+        if self.decl:
+            return self.decl.position
 
 
 class EmptyStmtNode(BaseNode):
@@ -553,6 +704,10 @@ class EmptyStmtNode(BaseNode):
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('semicolon', self.semicolon)
+
+    @property
+    def position(self):
+        return self.semicolon
 
 
 class LabeledStmtNode(BaseNode):
@@ -566,6 +721,11 @@ class LabeledStmtNode(BaseNode):
         yield from iter_field('colon', self.colon)
         yield from iter_field('stmt', self.stmt)
 
+    @property
+    def position(self):
+        if self.label:
+            return self.label.position
+
 
 class ExprStmtNode(BaseNode):
     node_type: Literal[NodeType.EXPR_STMT] = Field(alias='NodeType', default=NodeType.EXPR_STMT)
@@ -573,6 +733,11 @@ class ExprStmtNode(BaseNode):
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('x', self.x)
+
+    @property
+    def position(self):
+        if self.x:
+            return self.x.position
 
 
 class SendStmtNode(BaseNode):
@@ -586,6 +751,11 @@ class SendStmtNode(BaseNode):
         yield from iter_field('arrow', self.arrow)
         yield from iter_field('value', self.value)
 
+    @property
+    def position(self):
+        if self.chan:
+            return self.chan.position
+
 
 class IncDecStmtNode(BaseNode):
     node_type: Literal[NodeType.INC_DEC_STMT] = Field(alias='NodeType', default=NodeType.INC_DEC_STMT)
@@ -596,6 +766,11 @@ class IncDecStmtNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('x', self.x)
         yield from iter_field('tok_pos', self.tok_pos)
+
+    @property
+    def position(self):
+        if self.x:
+            return self.x.position
 
 
 class AssignStmtNode(BaseNode):
@@ -610,6 +785,11 @@ class AssignStmtNode(BaseNode):
         yield from iter_field('tok_pos', self.tok_pos)
         yield from iter_field('rhs', self.rhs)
 
+    @property
+    def position(self):
+        if self.lhs:
+            return self.lhs[0].position
+
 
 class GoStmtNode(BaseNode):
     node_type: Literal[NodeType.GO_STMT] = Field(alias='NodeType', default=NodeType.GO_STMT)
@@ -619,6 +799,10 @@ class GoStmtNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('go', self.go)
         yield from iter_field('call', self.call)
+
+    @property
+    def position(self):
+        return self.go
 
 
 class DeferStmtNode(BaseNode):
@@ -630,6 +814,10 @@ class DeferStmtNode(BaseNode):
         yield from iter_field('defer', self.defer)
         yield from iter_field('call', self.call)
 
+    @property
+    def position(self):
+        return self.defer
+
 
 class ReturnStmtNode(BaseNode):
     node_type: Literal[NodeType.RETURN_STMT] = Field(alias='NodeType', default=NodeType.RETURN_STMT)
@@ -639,6 +827,10 @@ class ReturnStmtNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('return_pos', self.return_pos)
         yield from iter_field('results', self.results)
+
+    @property
+    def position(self):
+        return self.return_pos
 
 
 class BranchStmtNode(BaseNode):
@@ -651,6 +843,10 @@ class BranchStmtNode(BaseNode):
         yield from iter_field('tok_pos', self.tok_pos)
         yield from iter_field('label', self.label)
 
+    @property
+    def position(self):
+        return self.tok_pos
+
 
 class BlockStmtNode(BaseNode):
     node_type: Literal[NodeType.BLOCK_STMT] = Field(alias='NodeType', default=NodeType.BLOCK_STMT)
@@ -662,6 +858,10 @@ class BlockStmtNode(BaseNode):
         yield from iter_field('lbrace', self.lbrace)
         yield from iter_field('stmt_list', self.stmt_list)
         yield from iter_field('rbrace', self.rbrace)
+
+    @property
+    def position(self):
+        return self.lbrace
 
 
 class IfStmtNode(BaseNode):
@@ -679,6 +879,10 @@ class IfStmtNode(BaseNode):
         yield from iter_field('body', self.body)
         yield from iter_field('else_pos', self.else_pos)
 
+    @property
+    def position(self):
+        return self.if_pos
+
 
 class CaseClauseNode(BaseNode):
     node_type: Literal[NodeType.CASE_CLAUSE] = Field(alias='NodeType', default=NodeType.CASE_CLAUSE)
@@ -692,6 +896,10 @@ class CaseClauseNode(BaseNode):
         yield from iter_field('expr_list', self.expr_list)
         yield from iter_field('colon', self.colon)
         yield from iter_field('body', self.body)
+
+    @property
+    def position(self):
+        return self.case_pos
 
 
 class SwitchStmtNode(BaseNode):
@@ -707,6 +915,10 @@ class SwitchStmtNode(BaseNode):
         yield from iter_field('tag', self.tag)
         yield from iter_field('body', self.body)
 
+    @property
+    def position(self):
+        return self.switch
+
 
 class TypeSwitchStmtNode(BaseNode):
     node_type: Literal[NodeType.TYPE_SWITCH_STMT] = Field(alias='NodeType', default=NodeType.TYPE_SWITCH_STMT)
@@ -720,6 +932,10 @@ class TypeSwitchStmtNode(BaseNode):
         yield from iter_field('init', self.init)
         yield from iter_field('assign', self.assign)
         yield from iter_field('body', self.body)
+
+    @property
+    def position(self):
+        return self.switch
 
 
 class CommClauseNode(BaseNode):
@@ -735,6 +951,10 @@ class CommClauseNode(BaseNode):
         yield from iter_field('colon', self.colon)
         yield from iter_field('body', self.body)
 
+    @property
+    def position(self):
+        return self.case_pos
+
 
 class SelectStmtNode(BaseNode):
     node_type: Literal[NodeType.SELECT_STMT] = Field(alias='NodeType', default=NodeType.SELECT_STMT)
@@ -744,6 +964,10 @@ class SelectStmtNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('select', self.select)
         yield from iter_field('body', self.body)
+
+    @property
+    def position(self):
+        return self.select
 
 
 class ForStmtNode(BaseNode):
@@ -760,6 +984,10 @@ class ForStmtNode(BaseNode):
         yield from iter_field('cond', self.cond)
         yield from iter_field('post', self.post)
         yield from iter_field('body', self.body)
+
+    @property
+    def position(self):
+        return self.for_pos
 
 
 class RangeStmtNode(BaseNode):
@@ -780,6 +1008,10 @@ class RangeStmtNode(BaseNode):
         yield from iter_field('x', self.x)
         yield from iter_field('body', self.body)
 
+    @property
+    def position(self):
+        return self.for_pos
+
 
 class ImportSpecNode(BaseNode):
     node_type: Literal[NodeType.IMPORT_SPEC] = Field(alias='NodeType', default=NodeType.IMPORT_SPEC)
@@ -796,6 +1028,13 @@ class ImportSpecNode(BaseNode):
         yield from iter_field('comment', self.comment)
         yield from iter_field('end_pos', self.end_pos)
 
+    @property
+    def position(self):
+        if self.name:
+            return self.name.position
+        if self.path:
+            return self.path.position
+
 
 class ValueSpecNode(BaseNode):
     node_type: Literal[NodeType.VALUE_SPEC] = Field(alias='NodeType', default=NodeType.VALUE_SPEC)
@@ -811,6 +1050,11 @@ class ValueSpecNode(BaseNode):
         yield from iter_field('type', self.type)
         yield from iter_field('values', self.values)
         yield from iter_field('comment', self.comment)
+
+    @property
+    def position(self):
+        if self.names:
+            return self.names[0].position
 
 
 class TypeSpecNode(BaseNode):
@@ -830,6 +1074,11 @@ class TypeSpecNode(BaseNode):
         yield from iter_field('type', self.type)
         yield from iter_field('comment', self.comment)
 
+    @property
+    def position(self):
+        if self.name:
+            return self.name.position
+
 
 class BadDeclNode(BaseNode):
     node_type: Literal[NodeType.BAD_DECL] = Field(alias='NodeType', default=NodeType.BAD_DECL)
@@ -839,6 +1088,10 @@ class BadDeclNode(BaseNode):
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('from_pos', self.from_pos)
         yield from iter_field('to_pos', self.to_pos)
+
+    @property
+    def position(self):
+        return self.from_pos
 
 
 class GenDeclNode(BaseNode):
@@ -856,6 +1109,10 @@ class GenDeclNode(BaseNode):
         yield from iter_field('lparen', self.lparen)
         yield from iter_field('specs', self.specs)
         yield from iter_field('rparen', self.rparen)
+
+    @property
+    def position(self):
+        return self.tok_pos
 
 
 class FuncDeclNode(BaseNode):
@@ -878,6 +1135,11 @@ class FuncDeclNode(BaseNode):
         yield from iter_field('name', self.name)
         yield from iter_field('type', self.type)
         yield from iter_field('body', self.body)
+
+    @property
+    def position(self):
+        if self.recv:
+            return self.recv.position
 
 
 class LineInfo(BaseModel):
@@ -921,6 +1183,10 @@ class FileNode(BaseNode):
         yield from iter_field('unresolved', self.unresolved)
         yield from iter_field('comments', self.comments)
 
+    @property
+    def position(self):
+        return self.package
+
 
 class PackageNode(BaseNode):
     node_type: Literal[NodeType.PACKAGE] = Field(alias='NodeType', default=NodeType.PACKAGE)
@@ -931,6 +1197,10 @@ class PackageNode(BaseNode):
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('files', self.files)
+
+    @property
+    def position(self):
+        return None
 
 
 class MatchOperatorType(str, Enum):
@@ -949,6 +1219,10 @@ class MatchRuleNode(BaseNode):
 
     def iterate_children(self) -> FieldSequence:
         yield from iter_field('rules', self.rules)
+
+    @property
+    def position(self):
+        return None
 
 
 BaseNode.update_forward_refs()
